@@ -22,6 +22,9 @@ android {
     }
 
     signingConfigs {
+        // NOTE: keystore.jks is intentionally committed to this public repo so
+        // anyone can produce reproducible, signed APKs. It is a shared public
+        // signature, not a secret.
         debug {
             storeFile file("keystore.jks")
             keyAlias "PADumper"
@@ -57,7 +60,6 @@ android {
     buildFeatures {
         aidl true
         buildConfig true
-        viewBinding true
         compose true
     }
 
@@ -90,10 +92,10 @@ dependencies {
     implementation 'androidx.activity:activity-compose:1.9.3'
     // Integration with ViewModels
     implementation "androidx.lifecycle:lifecycle-viewmodel-compose:2.9.1"
-    implementation "androidx.compose.runtime:runtime-livedata:1.7.8"
+    implementation "androidx.lifecycle:lifecycle-runtime-ktx:2.9.1"
+    implementation "androidx.compose.runtime:runtime-livedata"
     // Integration with Navigation
     implementation "androidx.navigation:navigation-compose:2.8.8"
-    implementation 'com.google.android.material:material:1.12.0'
 
     //Root
     def libsuVersion = "6.0.0"

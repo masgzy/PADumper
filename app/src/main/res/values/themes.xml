@@ -1,3 +1,7 @@
 <resources>
-    <style name="Theme.PADumper" parent="Theme.MaterialComponents.DayNight.DarkActionBar"/>
+    <!-- Material3 + NoActionBar: the UI is fully Compose (TopAppBar included),
+         so a XML ActionBar would show a second title bar on some devices.
+         Material3 themes are AppCompat descendants, which AppCompatActivity
+         requires, and MaterialAlertDialogBuilder picks up the M3 styling. -->
+    <style name="Theme.PADumper" parent="Theme.Material3.DayNight.NoActionBar"/>
 </resources>
