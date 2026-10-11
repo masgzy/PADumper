@@ -7,13 +7,9 @@
     <string name="fix_elf_result">Fix ELF</string>
     <string name="dump">Dump</string>
     <string name="github_repository">Github</string>
-    <string name="libil2cpp">libil2cpp.so</string>
     <string name="home">Home</string>
     <string name="log">Log</string>
-    <string name="check_flag_address">Check flag address</string>
-    <string name="arch_abi_32_bit_or_64_bit">ELF Arch (32 Bit or 64 Bit)</string>
     <string name="copy_console">Copy Console</string>
-    <string name="select">Select</string>
     <string name="cancel">Cancel</string>
     <string name="clear_console">Clear Console</string>
 

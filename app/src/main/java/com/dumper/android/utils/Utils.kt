@@ -27,7 +27,7 @@ fun Context.openGithubPage() {
     startActivity(
         Intent(
             Intent.ACTION_VIEW,
-            Uri.parse("https://github.com/BryanGIG/PADumper")
+            Uri.parse("https://github.com/masgzy/PADumper")
         )
     )
 }
