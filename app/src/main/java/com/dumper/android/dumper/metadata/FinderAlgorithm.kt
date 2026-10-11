@@ -11,19 +11,23 @@ fun containsPatternWithWildcard(buffer: ByteArray, pattern: String): Boolean {
             }
         }
 
-    for (i in buffer.indices) {
-        if (patternBytes.size > (buffer.size - i))
-            return false
+    if (patternBytes.size > buffer.size)
+        return false
 
+    for (i in 0..(buffer.size - patternBytes.size)) {
+        var matched = true
         for (j in patternBytes.indices) {
             if (patternBytes[j] == null)
                 continue  // Skip wildcard comparison
 
-            if (buffer[i + j] != patternBytes[j])
-                continue
+            if (buffer[i + j] != patternBytes[j]) {
+                matched = false
+                break
+            }
         }
 
-        return true
+        if (matched)
+            return true
     }
 
     return false
@@ -53,4 +57,3 @@ fun containsAnyByteArray(byteAllocate: ByteBuffer, byteArray: ByteArray): Boolea
     }
     return false
 }
-
