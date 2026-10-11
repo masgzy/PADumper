@@ -1,9 +1,9 @@
 plugins {
-    id 'com.android.application'
-    id 'org.jetbrains.kotlin.android'
-    id 'org.jetbrains.kotlin.plugin.compose'
-    id 'kotlin-parcelize'
-    id 'org.lsposed.lsplugin.jgit'
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.kotlin.compose.compiler)
+    alias(libs.plugins.kotlin.parcelize)
+    alias(libs.plugins.lsplugin.jgit)
 }
 
 var repo = jgit.repo(true)
@@ -63,45 +63,52 @@ android {
         compose true
     }
 
-    kotlinOptions {
-        jvmTarget = '21'
+    lint {
+        // lifecycle-livedata 2.9.x ships the NullSafeMutableLiveData detector,
+        // which crashes under Kotlin 2.2 UAST analysis with
+        // IncompatibleClassChangeError (KaCallableMemberCall) during
+        // lintVitalRelease. Nothing else regressed - disable just that check.
+        disable "NullSafeMutableLiveData"
     }
 }
 
-composeCompiler {
-    enableStrongSkippingMode = true
-    reportsDestination = layout.buildDirectory.dir("compose_compiler")
+kotlin {
+    compilerOptions {
+        // Replaces the deprecated android.kotlinOptions DSL (Kotlin 2.2+)
+        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21
+    }
 }
 
 dependencies {
-
     //Ui
-    def composeBom = platform("androidx.compose:compose-bom:2025.06.01")
+    def composeBom = platform(libs.compose.bom)
     implementation composeBom
     androidTestImplementation composeBom
 
-    implementation 'androidx.appcompat:appcompat:1.7.0'
-    implementation 'androidx.compose.material3:material3'
-    implementation 'com.google.android.material:material:1.12.0'
-    implementation 'androidx.compose.material:material-icons-extended'
+    implementation libs.androidx.appcompat
+    implementation libs.compose.material3
+    implementation libs.google.material
+    implementation libs.compose.material.icons.extended
 
     // Android Studio Preview support
-    implementation 'androidx.compose.ui:ui-tooling-preview'
-    debugImplementation 'androidx.compose.ui:ui-tooling'
+    implementation libs.compose.ui.tooling.preview
+    debugImplementation libs.compose.ui.tooling
     // Integration with activities
-    implementation 'androidx.activity:activity-compose:1.9.3'
+    implementation libs.androidx.activity.compose
     // Integration with ViewModels
-    implementation "androidx.lifecycle:lifecycle-viewmodel-compose:2.9.1"
-    implementation "androidx.lifecycle:lifecycle-runtime-ktx:2.9.1"
-    implementation "androidx.compose.runtime:runtime-livedata"
+    implementation libs.androidx.lifecycle.viewmodel.compose
+    implementation libs.androidx.lifecycle.runtime.ktx
+    implementation libs.compose.runtime.livedata
     // Integration with Navigation
-    implementation "androidx.navigation:navigation-compose:2.8.8"
+    implementation libs.androidx.navigation.compose
 
     //Root
-    def libsuVersion = "6.0.0"
-    implementation "com.github.topjohnwu.libsu:core:$libsuVersion"
-    implementation "com.github.topjohnwu.libsu:service:$libsuVersion"
+    implementation libs.libsu.core
+    implementation libs.libsu.service
 
     //Storage Helper
-    implementation "com.anggrayudi:storage:2.2.0"
+    implementation libs.anggrayudi.storage
+
+    //Unit tests
+    testImplementation libs.junit
 }
