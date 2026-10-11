@@ -6,6 +6,7 @@ import android.content.Context
 import android.widget.Toast
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
+import com.dumper.android.R
 import com.dumper.android.ui.Event
 
 class ConsoleViewModel : ViewModel() {
@@ -17,7 +18,7 @@ class ConsoleViewModel : ViewModel() {
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         val clip = ClipData.newPlainText("PADumper-Log", console.value)
         clipboard.setPrimaryClip(clip)
-        Toast.makeText(context, "Log Copied!", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, R.string.log_copied, Toast.LENGTH_SHORT).show()
     }
 
     fun append(text: String) {

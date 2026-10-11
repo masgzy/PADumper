@@ -16,4 +16,30 @@
     <string name="select">Select</string>
     <string name="cancel">Cancel</string>
     <string name="clear_console">Clear Console</string>
+
+    <!-- Dialogs & Toasts -->
+    <string name="ok">OK</string>
+    <string name="warning">Warning</string>
+    <string name="storage_permission_granted">Storage permissions granted</string>
+    <string name="storage_permission_denied">Storage permissions denied</string>
+    <string name="storage_permission_required_message">This app requires storage permission to work properly</string>
+    <string name="process_name_empty">Process name is empty</string>
+    <string name="lib_name_empty">Lib name is empty</string>
+    <string name="no_process_found">No process found</string>
+    <string name="log_copied">Log Copied!</string>
+    <string name="dump_success">Dump success!</string>
+    <string name="dump_error">Dump error!</string>
+
+    <!-- Splash -->
+    <string name="method_root">Root</string>
+    <string name="method_non_root">Non Root</string>
+    <string name="using_method_format">Using %1$s method</string>
+    <string name="ksu_detected_message">KernelSU is detected, please grant root permission manually!\n\nIf you want to use Non Root method, ignore this warning and continue.</string>
+    <string name="launch">Launch</string>
+    <string name="ignore">Ignore</string>
+
+    <!-- Language -->
+    <string name="language">Language</string>
+    <string name="language_dialog_title">Language</string>
+    <string name="follow_system">Follow system</string>
 </resources>

@@ -5,6 +5,7 @@ import android.widget.Toast
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import com.dumper.android.core.MainActivity
+import com.dumper.android.R
 import com.dumper.android.dumper.process.ProcessData
 import com.dumper.android.utils.asMainActivity
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -19,7 +20,7 @@ class MemoryViewModel : ViewModel() {
 
     fun showProcess(ctx: MainActivity, list: List<ProcessData>) {
         if (list.isEmpty()) {
-            Toast.makeText(ctx, "No process found", Toast.LENGTH_SHORT).show()
+            Toast.makeText(ctx, R.string.no_process_found, Toast.LENGTH_SHORT).show()
             return
         }
 

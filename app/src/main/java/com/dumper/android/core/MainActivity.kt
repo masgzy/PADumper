@@ -5,7 +5,7 @@ import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
-import androidx.activity.ComponentActivity
+import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import com.anggrayudi.storage.SimpleStorageHelper
@@ -21,6 +21,7 @@ import com.dumper.android.dumper.OutputHandler
 import com.dumper.android.dumper.process.Process
 import com.dumper.android.dumper.sofixer.FixerUtils
 import com.dumper.android.messager.AIDLServiceConnection
+import com.dumper.android.R
 import com.dumper.android.ui.MainScreen
 import com.dumper.android.ui.console.ConsoleViewModel
 import com.dumper.android.ui.memory.MemoryViewModel
@@ -30,7 +31,7 @@ import com.topjohnwu.superuser.Shell
 import com.topjohnwu.superuser.ipc.RootService
 import kotlin.system.exitProcess
 
-class MainActivity : ComponentActivity() {
+class MainActivity : AppCompatActivity() {
     var dumperConnection: AIDLServiceConnection? = null
 
     val memory: MemoryViewModel by viewModels()
@@ -46,12 +47,10 @@ class MainActivity : ComponentActivity() {
         )
         .withCallback(object : PermissionCallback {
             override fun onPermissionsChecked(result: PermissionResult, fromSystemDialog: Boolean) {
-                val grantStatus = if (result.areAllPermissionsGranted) "granted" else "denied"
-                Toast.makeText(
-                    baseContext,
-                    "Storage permissions are $grantStatus",
-                    Toast.LENGTH_SHORT
-                ).show()
+                val grantStatus =
+                    if (result.areAllPermissionsGranted) R.string.storage_permission_granted
+                    else R.string.storage_permission_denied
+                Toast.makeText(baseContext, grantStatus, Toast.LENGTH_SHORT).show()
             }
 
             override fun onShouldRedirectToSystemSettings(blockedPermissions: List<PermissionReport>) {
@@ -131,12 +130,12 @@ class MainActivity : ComponentActivity() {
         autoFix: Boolean
     ) {
         if (process.isBlank()) {
-            Toast.makeText(this, "Process name is empty", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, R.string.process_name_empty, Toast.LENGTH_SHORT).show()
             return
         }
 
         if (dumpFile.isBlank()) {
-            Toast.makeText(this, "Lib name is empty", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, R.string.lib_name_empty, Toast.LENGTH_SHORT).show()
             return
         }
 
@@ -157,13 +156,13 @@ class MainActivity : ComponentActivity() {
 
     private fun setupNonRoot(savedInstanceState: Bundle?) {
         MaterialAlertDialogBuilder(this)
-            .setTitle("Warning")
-            .setMessage("This app required storage permission to work properly")
-            .setPositiveButton("OK") { _, _ ->
+            .setTitle(getString(R.string.warning))
+            .setMessage(getString(R.string.storage_permission_required_message))
+            .setPositiveButton(getString(R.string.ok)) { _, _ ->
                 savedInstanceState?.let { storageHelper.onRestoreInstanceState(it) }
                 setupStoragePermission()
             }
-            .setNegativeButton("Cancel") { _, _ ->
+            .setNegativeButton(getString(R.string.cancel)) { _, _ ->
                 exitProcess(0)
             }
             .setCancelable(false)

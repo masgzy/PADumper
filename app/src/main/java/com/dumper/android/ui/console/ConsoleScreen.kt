@@ -42,9 +42,9 @@ fun ConsoleScreen(navController: NavController, viewModel: ConsoleViewModel = vi
     LaunchedEffect(eventCode) {
         eventCode?.getContentIfNotHandled()?.let {
             if (it == 0) {
-                Toast.makeText(context,"Dump success!", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, R.string.dump_success, Toast.LENGTH_SHORT).show()
             } else {
-                Toast.makeText(context, "Dump error!", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, R.string.dump_error, Toast.LENGTH_SHORT).show()
             }
         }
     }

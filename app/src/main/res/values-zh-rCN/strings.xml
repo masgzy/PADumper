@@ -1,0 +1,45 @@
+<resources>
+    <string name="app_name">PADumper</string>
+    <string name="process_name">进程名称</string>
+    <string name="select_process">选择应用</string>
+    <string name="elf_name">ELF 文件名</string>
+    <string name="dump_global_metadata_dat">转储 global-metadata.dat</string>
+    <string name="fix_elf_result">修复 ELF</string>
+    <string name="dump">开始转储</string>
+    <string name="github_repository">GitHub</string>
+    <string name="libil2cpp">libil2cpp.so</string>
+    <string name="home">首页</string>
+    <string name="log">日志</string>
+    <string name="check_flag_address">检查 flag 地址</string>
+    <string name="arch_abi_32_bit_or_64_bit">ELF 架构（32 位或 64 位）</string>
+    <string name="copy_console">复制控制台</string>
+    <string name="select">选择</string>
+    <string name="cancel">取消</string>
+    <string name="clear_console">清空控制台</string>
+
+    <!-- 对话框与 Toast -->
+    <string name="ok">确定</string>
+    <string name="warning">警告</string>
+    <string name="storage_permission_granted">存储权限已授予</string>
+    <string name="storage_permission_denied">存储权限被拒绝</string>
+    <string name="storage_permission_required_message">本应用需要存储权限才能正常工作</string>
+    <string name="process_name_empty">进程名不能为空</string>
+    <string name="lib_name_empty">ELF 文件名不能为空</string>
+    <string name="no_process_found">未找到任何进程</string>
+    <string name="log_copied">日志已复制！</string>
+    <string name="dump_success">转储成功！</string>
+    <string name="dump_error">转储失败！</string>
+
+    <!-- 启动页 -->
+    <string name="method_root">Root</string>
+    <string name="method_non_root">非 Root</string>
+    <string name="using_method_format">正在使用 %1$s 模式</string>
+    <string name="ksu_detected_message">检测到 KernelSU，请手动授予 Root 权限！\n\n如需使用非 Root 模式，请忽略此警告并继续。</string>
+    <string name="launch">启动</string>
+    <string name="ignore">忽略</string>
+
+    <!-- 语言 -->
+    <string name="language">语言</string>
+    <string name="language_dialog_title">语言</string>
+    <string name="follow_system">跟随系统</string>
+</resources>
