@@ -8,6 +8,7 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.lifecycle.lifecycleScope
 import com.anggrayudi.storage.SimpleStorageHelper
 import com.anggrayudi.storage.file.StorageId
 import com.anggrayudi.storage.permission.ActivityPermissionRequest
@@ -29,6 +30,8 @@ import com.dumper.android.ui.theme.PADumperTheme
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.topjohnwu.superuser.Shell
 import com.topjohnwu.superuser.ipc.RootService
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlin.system.exitProcess
 
 class MainActivity : AppCompatActivity() {
@@ -149,8 +152,14 @@ class MainActivity : AppCompatActivity() {
                 return
             }
 
+            // Dumping reads the whole memory region from /proc/pid/mem and
+            // writes it to storage, which can take minutes for large .so
+            // files. Run it on Dispatchers.IO - doing this on the main
+            // thread froze the UI and triggered ANRs.
             val outHandler = OutputHandler(console)
-            Dumper(this, config, outHandler).dumpFile()
+            lifecycleScope.launch(Dispatchers.IO) {
+                Dumper(applicationContext, config, outHandler).dumpFile()
+            }
         }
     }
 

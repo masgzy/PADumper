@@ -27,16 +27,39 @@ class AIDLServiceConnection(private val activity: MainActivity) : ServiceConnect
             val readSide = pipe[0]
             val writeSide = pipe[1]
 
-            iDumperInterface?.dump(config, writeSide)
+            // The binder call blocks until the root-side dump completes. Run
+            // it on its own thread so the reader below can drain the pipe
+            // concurrently - otherwise a full 64 KB pipe buffer would block
+            // the root process forever (classic deadlock).
+            Thread {
+                runCatching {
+                    iDumperInterface?.dump(config, writeSide)
+                }.onFailure { e ->
+                    activity.runOnUiThread {
+                        activity.console.appendError(e.message ?: "Dump binder call failed")
+                    }
+                }
+                // The remote holds its own dup of this fd (transferred during
+                // the binder transaction), so closing our copy here is safe
+                // and lets the reader below reach EOF.
+                runCatching { writeSide.close() }
+            }.start()
 
-            val inputStream = ParcelFileDescriptor.AutoCloseInputStream(readSide)
-            val buffer = ByteArray(1024)
-            var bytesRead: Int
-
-            while (inputStream.read(buffer).also { bytesRead = it } != -1) {
-                val data = buffer.copyOfRange(0, bytesRead)
+            // Read with a Reader: it decodes UTF-8 incrementally, so
+            // multi-byte characters split across chunk boundaries no longer
+            // turn into garbage (the old code decoded every 1 KB chunk
+            // independently).
+            runCatching {
+                ParcelFileDescriptor.AutoCloseInputStream(readSide).use { inputStream ->
+                    inputStream.bufferedReader(Charsets.UTF_8).forEachLine { line ->
+                        activity.runOnUiThread {
+                            activity.console.appendLine(line)
+                        }
+                    }
+                }
+            }.onFailure { e ->
                 activity.runOnUiThread {
-                    activity.console.append(String(data))
+                    activity.console.appendError(e.message ?: "Failed to read dump logs")
                 }
             }
         }.start()
