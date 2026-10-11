@@ -64,7 +64,9 @@ class MapLineParser(line: String) {
     }
 
     fun isValid(): Boolean {
-        return getStartAddress() > 0L || getEndAddress() > 0L
+        // A usable region needs BOTH addresses; a line with only one of them
+        // set is corrupt (the old || accepted start=0 garbage).
+        return getStartAddress() > 0L && getEndAddress() > 0L
     }
 
     override fun toString(): String {

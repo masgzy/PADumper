@@ -8,6 +8,7 @@ import com.dumper.android.dumper.elf.isELF
 import com.dumper.android.dumper.exception.DumperException
 import com.dumper.android.dumper.maps.MapLineParser
 import com.dumper.android.dumper.metadata.MetadataFinder
+import com.dumper.android.dumper.metadata.MetadataFixer
 import com.dumper.android.dumper.process.Process
 import com.dumper.android.dumper.sofixer.Fixer
 import com.dumper.android.utils.Bytes_to_MB
@@ -17,7 +18,6 @@ import com.dumper.android.utils.copyToFile
 import com.dumper.android.utils.toHex
 import com.topjohnwu.superuser.Shell
 import java.io.File
-import java.io.FileNotFoundException
 import java.io.RandomAccessFile
 import java.nio.channels.FileChannel
 
@@ -72,9 +72,11 @@ class Dumper(private val context: Context, private val config: DumperConfig, pri
             if (!outputDir.exists())
                 outputDir.mkdirs()
 
+            // copyToFile() creates the output file itself; the old
+            // "if (!outputDir.exists()) outputFile.createNewFile()" checked
+            // the freshly-created directory instead of the file, so it was
+            // effectively dead code.
             val outputFile = File(outputDir, "${mem.getStartAddress().toHex()}-${mem.getEndAddress().toHex()}-${mem.getPath().FileName}")
-            if (!outputDir.exists())
-                outputFile.createNewFile()
 
             dump(mem, context.filesDir.absolutePath, outputFile, outputHandler)
 
@@ -86,7 +88,9 @@ class Dumper(private val context: Context, private val config: DumperConfig, pri
                     else {
                         outputHandler.appendInfo("Dumping global-metadata.dat...")
                         config.autoFix = false
-                        dump(it, outputFile = File(outputDir, "global-metadata.dat"), outLog = outputHandler)
+                        val metadataFile = File(outputDir, "global-metadata.dat")
+                        dump(it, outputFile = metadataFile, outLog = outputHandler)
+                        fixMetadataHeader(metadataFile)
                     }
                 }
             }
@@ -108,6 +112,30 @@ class Dumper(private val context: Context, private val config: DumperConfig, pri
     }
 
     /**
+     * Fix the dumped metadata file.
+     *
+     * A metadata dump may not start with the expected magic (e.g. when the
+     * region was located by scanning instead of by file path). Repair the
+     * header in place; a failure here must never fail an otherwise
+     * successful dump.
+     */
+    private fun fixMetadataHeader(metadataFile: File) {
+        runCatching {
+            val fixer = MetadataFixer()
+            if (fixer.isNeedFixer(metadataFile)) {
+                outputHandler.appendInfo("Fixing global-metadata.dat header...")
+                if (fixer.fixHeader(metadataFile, checkFile = false)) {
+                    outputHandler.appendSuccess("global-metadata.dat header fixed")
+                } else {
+                    outputHandler.appendWarning("Failed to fix global-metadata.dat header")
+                }
+            }
+        }.onFailure {
+            outputHandler.appendWarning("Metadata header check failed: ${it.message}")
+        }
+    }
+
+    /**
      * Dump the memory to a file.
      *
      * @param mem The memory map line parser.
@@ -121,27 +149,12 @@ class Dumper(private val context: Context, private val config: DumperConfig, pri
         outputFile: File,
         outLog: OutputHandler
     ) {
-        val channel = RandomAccessFile("/proc/$pid/mem", "r").channel
-
-        /* Im considering use this approach but haven't test it yet, so i will leave it commented
-
-        File("/proc/$pid/map_files").listFiles()
-            ?.find { it.name.contains("${mem.getStartAddress().toHex()}-") }
-            ?.let {
-                it.copyTo(outputFile, true)
-                if (config.autoFix) {
-                    fixDump(channel, mem, outputFile, fixerPath, outLog)
-                    channel.close()
-                }
-            }
-        */
-
-        channel.use {
-            it.copyToFile(mem.getStartAddress(), mem.getSize(), outputFile)
+        RandomAccessFile("/proc/$pid/mem", "r").use { memFile ->
+            val channel = memFile.channel
+            channel.copyToFile(mem.getStartAddress(), mem.getSize(), outputFile)
             if (config.autoFix) {
-                fixDump(it, mem, outputFile, fixerPath, outLog)
+                fixDump(channel, mem, outputFile, fixerPath, outLog)
             }
-            it.close()
         }
     }
 
@@ -200,27 +213,32 @@ class Dumper(private val context: Context, private val config: DumperConfig, pri
      * @return The correct memory map line parser.
      */
     private fun findCorrectFiles(startIndex: Int = 0, parsedMaps : List<MapLineParser>) : MapLineParser? {
-        var map: MapLineParser? = null
-        for (i in startIndex until parsedMaps.size) {
-            val mapLineParser = parsedMaps[i]
-            if (map == null) {
-                val path = mapLineParser.getPath()
-                if (!path.contains(".so")) {
-                    map = mapLineParser // For all other files
-                } else if (isELF(pid!!, mapLineParser.getStartAddress())) {
-                    map = mapLineParser // Must be valid .so ELF files
-                }
-            } else {
-                if (map.getInode() == mapLineParser.getInode()) {
-                    map.setEndAddress(mapLineParser.getEndAddress())
+        // Open /proc/pid/mem once and reuse it for every isELF() probe;
+        // the old code re-opened the file per candidate line.
+        RandomAccessFile("/proc/$pid/mem", "r").use { memFile ->
+            val memChannel = memFile.channel
+            var map: MapLineParser? = null
+            for (i in startIndex until parsedMaps.size) {
+                val mapLineParser = parsedMaps[i]
+                if (map == null) {
+                    val path = mapLineParser.getPath()
+                    if (!path.contains(".so")) {
+                        map = mapLineParser // For all other files
+                    } else if (isELF(memChannel, mapLineParser.getStartAddress())) {
+                        map = mapLineParser // Must be valid .so ELF files
+                    }
+                } else {
+                    if (map.getInode() == mapLineParser.getInode()) {
+                        map.setEndAddress(mapLineParser.getEndAddress())
 
-                    if (map.getSize() > config.limitMaxDumpSize) {
-                        return findCorrectFiles(startIndex + 1, parsedMaps)
+                        if (map.getSize() > config.limitMaxDumpSize) {
+                            return findCorrectFiles(startIndex + 1, parsedMaps)
+                        }
                     }
                 }
             }
+            return map
         }
-        return map
     }
 }
 

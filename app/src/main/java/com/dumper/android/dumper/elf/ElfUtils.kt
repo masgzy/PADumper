@@ -18,12 +18,19 @@ private val hElf =
  * @return True if the memory at the start address is an ELF file, false otherwise.
  */
 fun isELF(pid: Int, startAddress: Long): Boolean {
-    val mFile = RandomAccessFile("/proc/$pid/mem", "r")
-    val channel = mFile.channel
+    RandomAccessFile("/proc/$pid/mem", "r").use { mFile ->
+        return isELF(mFile.channel, startAddress)
+    }
+}
+
+/**
+ * Same check, but reuses an already-open channel. Scanning maps calls this
+ * once per candidate line - re-opening /proc/pid/mem for every line is
+ * wasteful and fails on some devices.
+ */
+fun isELF(channel: FileChannel, startAddress: Long): Boolean {
     val byteHeader = ByteBuffer.allocate(4)
-    channel.read(byteHeader, startAddress)
-    channel.close()
-    mFile.close()
+    runCatching { channel.read(byteHeader, startAddress) }
     return byteHeader.array().contentEquals(hElf)
 }
 

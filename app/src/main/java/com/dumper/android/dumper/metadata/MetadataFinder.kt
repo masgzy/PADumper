@@ -39,23 +39,30 @@ class MetadataFinder(private val pid: Int) {
             throw FileNotFoundException("Failed To Open : ${mapsFile.path}")
         }
 
-        val memFile = RandomAccessFile("/proc/${pid}/mem", "r").channel
+        // use { } guarantees the /proc/pid/mem fd is released on every path
+        // (the old code leaked it whenever no region matched or read() threw)
+        RandomAccessFile("/proc/${pid}/mem", "r").use { memFile ->
+            val memChannel = memFile.channel
 
-        mapsFile.readLines()
-            .filter {  it.contains(".dat") && !filteredPath.any { ext -> it.contains(ext) } }
-            .map { MapLineParser(it) }
-            .forEach {
-                Log.i(TAG, it.toString())
+            mapsFile.readLines()
+                .filter {  it.contains(".dat") && !filteredPath.any { ext -> it.contains(ext) } }
+                .map { MapLineParser(it) }
+                .forEach {
+                    Log.i(TAG, it.toString())
 
-                // Clear buffer and new position
-                byteHeader.clear()
-                byteHeader.position(0)
+                    // Clear buffer and new position
+                    byteHeader.clear()
 
-                val bytesRead = memFile.read(byteHeader, it.getStartAddress())
-                if (bytesRead == customHeaderSize && containsPatternWithWildcard(byteHeader.array(), customHeader)) {
-                    return it
+                    val bytesRead = try {
+                        memChannel.read(byteHeader, it.getStartAddress())
+                    } catch (e: Exception) {
+                        -1 // unreadable region -> won't match, keep scanning
+                    }
+                    if (bytesRead == customHeaderSize && containsPatternWithWildcard(byteHeader.array(), customHeader)) {
+                        return it
+                    }
                 }
-            }
+        }
 
         return null
     }
@@ -66,42 +73,50 @@ class MetadataFinder(private val pid: Int) {
         outLog.appendInfo("Find by using function: $funcName")
 
         val funcNameBytes = funcName.toByteArray(Charsets.UTF_8)
-        val byteAllocate = ByteBuffer.allocate(2000) // 2 MB
+        val byteAllocate = ByteBuffer.allocate(2000) // 2 KB scan window
 
         val mapsFile = File("/proc/${pid}/maps")
         if (!mapsFile.exists()) {
             throw FileNotFoundException("Failed To Open : ${mapsFile.path}")
         }
 
-        val memFile = RandomAccessFile("/proc/${pid}/mem", "r").channel
+        RandomAccessFile("/proc/${pid}/mem", "r").use { memFile ->
+            val memChannel = memFile.channel
 
-        mapsFile.readLines()
-            .filter {
-                // mostly on path that has been deleted
-                it.contains("deleted")
-            }
-            .map { MapLineParser(it) }
-            .forEach {
-                var pos = it.getStartAddress()
-
-                while (pos <= it.getEndAddress()) {
-
-                    // Clear buffer and new position
-                    byteAllocate.clear()
-                    byteAllocate.position(0)
-
-                    if (memFile.read(byteAllocate, pos) <= 0)
-                        return null
-
-                    if (containsAnyByteArray(byteAllocate, funcNameBytes)) {
-                        memFile.close()
-                        return it
-                    }
-                    pos += 1024
+            mapsFile.readLines()
+                .filter {
+                    // mostly on path that has been deleted
+                    it.contains("deleted")
                 }
-            }
+                .map { MapLineParser(it) }
+                .forEach { region ->
+                    var pos = region.getStartAddress()
 
-        memFile.close()
+                    while (pos <= region.getEndAddress()) {
+
+                        // Clear buffer and new position
+                        byteAllocate.clear()
+
+                        // A region that cannot be read (unmapped hole,
+                        // protected page, process death) must only skip THIS
+                        // region - the old code returned null and abandoned
+                        // every remaining candidate region.
+                        val bytesRead = try {
+                            memChannel.read(byteAllocate, pos)
+                        } catch (e: Exception) {
+                            0
+                        }
+                        if (bytesRead <= 0)
+                            break
+
+                        if (containsAnyByteArray(byteAllocate, funcNameBytes)) {
+                            return region
+                        }
+                        pos += 1024
+                    }
+                }
+        }
+
         return null
     }
 

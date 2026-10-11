@@ -17,12 +17,13 @@ import kotlin.system.exitProcess
 class SplashActivity : AppCompatActivity() {
     companion object {
         init {
-            if (Shell.getCachedShell() != null) {
-                Shell.enableVerboseLogging = BuildConfig.DEBUG
-                Shell.setDefaultBuilder(
-                    Shell.Builder.create().setTimeout(10)
-                )
-            }
+            // Must be unconditional: setDefaultBuilder() configures the FIRST
+            // shell creation, and on cold start no shell is cached yet, so
+            // the old getCachedShell() guard skipped the 10s timeout setup.
+            Shell.enableVerboseLogging = BuildConfig.DEBUG
+            Shell.setDefaultBuilder(
+                Shell.Builder.create().setTimeout(10)
+            )
         }
     }
 
