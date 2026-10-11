@@ -15,6 +15,7 @@ Android process memory dumper, especially for the il2cpp game at runtime.
 - [x] In-app language switching (English / 简体中文)
 - [x] Custom address range dumping (including anonymous memory regions)
 - [x] One-click dump of every readable memory region of the process
+- [x] Metadata candidate verification: detects game-encrypted global-metadata.dat (custom protection containers), prefers the decrypted copy in memory (including anonymous buffers), and logs a verification verdict for every dumped file
 
 ## How To Use
 

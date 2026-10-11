@@ -14,7 +14,7 @@ object MemoryRegions {
     // Kernel pseudo-regions: [vsyscall] is never readable and vvar/vdso have
     // no value in a dump. /dev/* mappings are device memory - reading them
     // can fail or hang, and they are never useful in a dump.
-    private val SKIP_PATHS = setOf("[vvar]", "[vdso]", "[vsyscall]", "[vvar_vdso]")
+    val SKIP_PATHS = setOf("[vvar]", "[vdso]", "[vsyscall]", "[vvar_vdso]")
 
     /**
      * @param lines raw lines of /proc/[pid]/maps

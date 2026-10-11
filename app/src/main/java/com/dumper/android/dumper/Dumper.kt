@@ -11,6 +11,7 @@ import com.dumper.android.dumper.maps.MapLineParser
 import com.dumper.android.dumper.maps.MemoryRegions
 import com.dumper.android.dumper.metadata.MetadataFinder
 import com.dumper.android.dumper.metadata.MetadataFixer
+import com.dumper.android.dumper.metadata.MetadataVerifier
 import com.dumper.android.dumper.process.Process
 import com.dumper.android.dumper.sofixer.Fixer
 import com.dumper.android.utils.Bytes_to_MB
@@ -191,20 +192,64 @@ class Dumper(private val context: Context, private val config: DumperConfig, pri
 
     /**
      * Dump global-metadata.dat and repair its header.
+     *
+     * Candidates are pre-verified by [MetadataFinder]; every verified copy
+     * is dumped (protected games can hold more than one), and each dump is
+     * re-checked afterwards so encrypted/corrupt results are called out
+     * instead of silently reported as success.
      */
     private fun dumpMetadata(outputDir: File) {
-        val metadataFinder = MetadataFinder(pid!!)
-        metadataFinder.findUnityMetadata(outputHandler).let {
-            if (it == null)
-                outputHandler.appendError("Unable to find global-metadata.dat")
-            else {
-                outputHandler.appendInfo("Dumping global-metadata.dat...")
-                val metadataFile = File(outputDir, "global-metadata.dat")
-                // Header repair is handled by fixMetadataHeader(); the ELF
-                // fixer must not touch the metadata file (fix = false).
-                dump(it, outputFile = metadataFile, outLog = outputHandler, fix = false)
-                fixMetadataHeader(metadataFile)
+        val candidates = MetadataFinder(pid!!).findUnityMetadata(outputHandler)
+        if (candidates.isEmpty()) {
+            outputHandler.appendError("Unable to find global-metadata.dat")
+            return
+        }
+
+        candidates.forEachIndexed { index, candidate ->
+            val name = if (index == 0) "global-metadata.dat" else "global-metadata-${index + 1}.dat"
+            outputHandler.appendInfo(
+                "Dumping $name from ${candidate.region.getStartAddress().toHex()} (${candidate.region.getSize().Bytes_to_MB}MB)..."
+            )
+            val metadataFile = File(outputDir, name)
+            // Header repair is handled by fixMetadataHeader(); the ELF
+            // fixer must not touch the metadata file (fix = false).
+            dump(candidate.region, outputFile = metadataFile, outLog = outputHandler, fix = false)
+            fixMetadataHeader(metadataFile)
+            verifyDumpedMetadata(metadataFile, name)
+        }
+    }
+
+    /**
+     * Check the dumped metadata file and log an honest verdict.
+     *
+     * A file that fails verification is most likely the game's encrypted
+     * metadata asset (protected titles keep the encrypted asset mapped
+     * while the decrypted copy only exists under protection-specific
+     * conditions).
+     */
+    private fun verifyDumpedMetadata(file: File, name: String) {
+        runCatching {
+            RandomAccessFile(file, "r").use { raf ->
+                val length = raf.length()
+                if (length < MetadataVerifier.HEADER_SIZE) {
+                    outputHandler.appendWarning("$name is only $length bytes - not a usable metadata file")
+                    return
+                }
+                val header = ByteArray(MetadataVerifier.HEADER_SIZE)
+                raf.readFully(header)
+                val result = MetadataVerifier.check(header, length)
+                if (result.valid) {
+                    outputHandler.appendSuccess("$name verified (metadata version ${result.version}, ${length.Bytes_to_MB}MB)")
+                } else {
+                    outputHandler.appendWarning("$name header check failed: ${result.reason}")
+                    outputHandler.appendWarning(
+                        "$name may be encrypted by the game and might not open in Il2CppDumper. " +
+                                "Try dumping right after the loading screen, or use a hook-based dumper for protected games."
+                    )
+                }
             }
+        }.onFailure {
+            outputHandler.appendWarning("Metadata verification failed: ${it.message}")
         }
     }
 
