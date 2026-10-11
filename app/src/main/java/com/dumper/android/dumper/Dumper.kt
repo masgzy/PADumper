@@ -3,10 +3,12 @@ package com.dumper.android.dumper
 import android.annotation.SuppressLint
 import android.content.Context
 import android.os.Environment
+import android.os.StatFs
 import com.dumper.android.dumper.elf.getArchELF
 import com.dumper.android.dumper.elf.isELF
 import com.dumper.android.dumper.exception.DumperException
 import com.dumper.android.dumper.maps.MapLineParser
+import com.dumper.android.dumper.maps.MemoryRegions
 import com.dumper.android.dumper.metadata.MetadataFinder
 import com.dumper.android.dumper.metadata.MetadataFixer
 import com.dumper.android.dumper.process.Process
@@ -42,23 +44,10 @@ class Dumper(private val context: Context, private val config: DumperConfig, pri
             outputHandler.appendLine("==========================")
             outputHandler.appendLine("PROCESS: ${config.processName}")
             outputHandler.appendLine("PID: $pid")
-            outputHandler.appendLine("FILE: ${config.file}")
-
-            val mem = parseMap()
-
-            outputHandler.appendLine("Start Address: ${mem.getStartAddress().toHex()}")
-            if (mem.getStartAddress() < 1L) {
-                throw DumperException("Invalid start address!")
-            }
-
-            outputHandler.appendLine("End Address: ${mem.getEndAddress().toHex()}")
-            if (mem.getEndAddress() < 1L) {
-                throw DumperException("Invalid end address!")
-            }
-
-            outputHandler.appendLine("Size Memory: ${mem.getSize().Bytes_to_MB}MB (${mem.getSize()})")
-            if (mem.getSize() < 1L) {
-                throw DumperException("Invalid memory size!")
+            if (config.dumpAllMemory) {
+                outputHandler.appendLine("MODE: dump all memory regions")
+            } else {
+                outputHandler.appendLine("FILE: ${config.file}")
             }
 
             val fileOutPath =
@@ -72,27 +61,14 @@ class Dumper(private val context: Context, private val config: DumperConfig, pri
             if (!outputDir.exists())
                 outputDir.mkdirs()
 
-            // copyToFile() creates the output file itself; the old
-            // "if (!outputDir.exists()) outputFile.createNewFile()" checked
-            // the freshly-created directory instead of the file, so it was
-            // effectively dead code.
-            val outputFile = File(outputDir, "${mem.getStartAddress().toHex()}-${mem.getEndAddress().toHex()}-${mem.getPath().FileName}")
-
-            dump(mem, context.filesDir.absolutePath, outputFile, outputHandler)
+            if (config.dumpAllMemory) {
+                dumpAllMemory(outputDir)
+            } else {
+                dumpSingle(outputDir)
+            }
 
             if (config.isDumpMetadata) {
-                val metadataFinder = MetadataFinder(pid!!)
-                metadataFinder.findUnityMetadata(outputHandler).let {
-                    if (it == null)
-                        outputHandler.appendError("Unable to find global-metadata.dat")
-                    else {
-                        outputHandler.appendInfo("Dumping global-metadata.dat...")
-                        config.autoFix = false
-                        val metadataFile = File(outputDir, "global-metadata.dat")
-                        dump(it, outputFile = metadataFile, outLog = outputHandler)
-                        fixMetadataHeader(metadataFile)
-                    }
-                }
+                dumpMetadata(outputDir)
             }
 
             outputHandler.appendSuccess("Output: $outputDir")
@@ -108,6 +84,127 @@ class Dumper(private val context: Context, private val config: DumperConfig, pri
             outputHandler.appendLine("==========================")
             outputHandler.finish(-1)
             return -1
+        }
+    }
+
+    /**
+     * Single-region dump: locate the mapping matching [DumperConfig.file]
+     * (a library name or an explicit start-end address range) and dump it.
+     */
+    private fun dumpSingle(outputDir: File) {
+        val mem = parseMap()
+
+        outputHandler.appendLine("Start Address: ${mem.getStartAddress().toHex()}")
+        if (mem.getStartAddress() < 1L) {
+            throw DumperException("Invalid start address!")
+        }
+
+        outputHandler.appendLine("End Address: ${mem.getEndAddress().toHex()}")
+        if (mem.getEndAddress() < 1L) {
+            throw DumperException("Invalid end address!")
+        }
+
+        outputHandler.appendLine("Size Memory: ${mem.getSize().Bytes_to_MB}MB (${mem.getSize()})")
+        if (mem.getSize() < 1L) {
+            throw DumperException("Invalid memory size!")
+        }
+
+        // copyToFile() creates the output file itself; the old
+        // "if (!outputDir.exists()) outputFile.createNewFile()" checked
+        // the freshly-created directory instead of the file, so it was
+        // effectively dead code.
+        val outputFile = File(outputDir, "${mem.getStartAddress().toHex()}-${mem.getEndAddress().toHex()}-${regionLabel(mem)}")
+
+        dump(mem, context.filesDir.absolutePath, outputFile, outputHandler)
+    }
+
+    /**
+     * Dump every readable memory region of the process.
+     *
+     * Regions are collected from /proc/[pid]/maps by [MemoryRegions]
+     * (unreadable/pseudo regions skipped, adjacent same-allocation mappings
+     * merged), then dumped one by one. A single failing region never aborts
+     * the whole run - it is logged and skipped.
+     */
+    private fun dumpAllMemory(outputDir: File) {
+        val maps = File("/proc/$pid/maps")
+        if (!maps.exists()) {
+            throw DumperException("Failed to open : ${maps.path}")
+        }
+
+        val regions = MemoryRegions.collect(
+            lines = maps.readLines(),
+            limitMaxSize = config.limitMaxDumpSize,
+            onSkip = { outputHandler.appendWarning(it) }
+        )
+        if (regions.isEmpty()) {
+            throw DumperException("No readable memory regions found!")
+        }
+
+        val totalSize = regions.sumOf { it.getSize() }
+        outputHandler.appendLine("Regions: ${regions.size} (total ${totalSize.Bytes_to_MB}MB)")
+        checkFreeSpace(outputDir, totalSize)
+
+        val fixerPath = context.filesDir.absolutePath
+        var dumped = 0
+        var failed = 0
+
+        RandomAccessFile("/proc/$pid/mem", "r").use { memFile ->
+            val channel = memFile.channel
+            for ((index, mem) in regions.withIndex()) {
+                val label = regionLabel(mem)
+                val outputFile =
+                    File(outputDir, "${mem.getStartAddress().toHex()}-${mem.getEndAddress().toHex()}-$label")
+                outputHandler.appendLine(
+                    "[${index + 1}/${regions.size}] ${mem.getStartAddress().toHex()}-" +
+                            "${mem.getEndAddress().toHex()} $label (${mem.getSize().Bytes_to_MB}MB)"
+                )
+                try {
+                    channel.copyToFile(mem.getStartAddress(), mem.getSize(), outputFile)
+                    dumped++
+
+                    // The fixer rebuilds ELF program headers from memory;
+                    // only attempt it on real ELF libraries.
+                    if (config.autoFix && mem.getPath().endsWith(".so") && isELF(channel, mem.getStartAddress())) {
+                        runCatching { fixDump(channel, mem, outputFile, fixerPath, outputHandler) }
+                            .onFailure { outputHandler.appendWarning("Fix failed: ${it.message}") }
+                    }
+                } catch (e: Throwable) {
+                    failed++
+                    outputFile.delete()
+                    outputHandler.appendWarning("Failed: ${e.message ?: e.toString()}")
+                }
+            }
+        }
+
+        if (dumped == 0) {
+            throw DumperException("All $failed regions failed to dump!")
+        }
+
+        val summary = "Dumped $dumped/${regions.size} regions"
+        if (failed > 0) {
+            outputHandler.appendWarning("$summary, $failed failed")
+        } else {
+            outputHandler.appendSuccess(summary)
+        }
+    }
+
+    /**
+     * Dump global-metadata.dat and repair its header.
+     */
+    private fun dumpMetadata(outputDir: File) {
+        val metadataFinder = MetadataFinder(pid!!)
+        metadataFinder.findUnityMetadata(outputHandler).let {
+            if (it == null)
+                outputHandler.appendError("Unable to find global-metadata.dat")
+            else {
+                outputHandler.appendInfo("Dumping global-metadata.dat...")
+                val metadataFile = File(outputDir, "global-metadata.dat")
+                // Header repair is handled by fixMetadataHeader(); the ELF
+                // fixer must not touch the metadata file (fix = false).
+                dump(it, outputFile = metadataFile, outLog = outputHandler, fix = false)
+                fixMetadataHeader(metadataFile)
+            }
         }
     }
 
@@ -136,23 +233,46 @@ class Dumper(private val context: Context, private val config: DumperConfig, pri
     }
 
     /**
+     * Output file label for a region: the mapped file name for file-backed
+     * regions, "anon-<perms>" for anonymous ones.
+     */
+    private fun regionLabel(mem: MapLineParser): String {
+        return mem.getPath().FileName.ifEmpty { "anon-${mem.getPerms()}" }
+    }
+
+    /**
+     * Abort early when the output volume cannot possibly hold the dump.
+     */
+    private fun checkFreeSpace(outputDir: File, required: Long) {
+        val available = StatFs(outputDir.path).availableBytes
+        if (available < required) {
+            throw DumperException(
+                "Not enough free space: need ${required.Bytes_to_MB}MB, available ${available.Bytes_to_MB}MB"
+            )
+        }
+    }
+
+    /**
      * Dump the memory to a file.
      *
      * @param mem The memory map line parser.
      * @param fixerPath The path to the fixer.
      * @param outputFile The output file.
      * @param outLog The output handler.
+     * @param fix Whether to run the ELF fixer after dumping (metadata dumps
+     *        pass false; everything else follows [DumperConfig.autoFix]).
      */
     private fun dump(
         mem: MapLineParser,
         fixerPath: String? = null,
         outputFile: File,
-        outLog: OutputHandler
+        outLog: OutputHandler,
+        fix: Boolean = config.autoFix
     ) {
         RandomAccessFile("/proc/$pid/mem", "r").use { memFile ->
             val channel = memFile.channel
             channel.copyToFile(mem.getStartAddress(), mem.getSize(), outputFile)
-            if (config.autoFix) {
+            if (fix) {
                 fixDump(channel, mem, outputFile, fixerPath, outLog)
             }
         }
@@ -194,6 +314,13 @@ class Dumper(private val context: Context, private val config: DumperConfig, pri
             throw DumperException("Failed to open : ${files.path}")
         }
 
+        // Custom range ("7f2b1c001000-7f2b1c0b7000") dumps that exact range
+        // instead of a named library - this is the only way to grab
+        // anonymous regions.
+        MapLineParser.parseCustomRangeOrNull(config.file)?.let { (start, end) ->
+            return parseCustomMap(files, start, end)
+        }
+
         val parsedMaps = files.readLines()
             .filter { it.contains(config.file) }
             .map { MapLineParser(it) }
@@ -203,6 +330,24 @@ class Dumper(private val context: Context, private val config: DumperConfig, pri
             throw DumperException("start or end address not found!")
 
         return map
+    }
+
+    /**
+     * Build the region for a custom address range.
+     *
+     * The start address must fall inside a readable mapping - that validates
+     * the input and gives the dump file a meaningful name. A range spanning
+     * several mappings is fine: /proc/pid/mem reads any mapped page.
+     */
+    private fun parseCustomMap(mapsFile: File, start: Long, end: Long): MapLineParser {
+        val containing = mapsFile.readLines()
+            .mapNotNull { runCatching { MapLineParser(it) }.getOrNull() }
+            .firstOrNull {
+                it.getStartAddress() <= start && start < it.getEndAddress() && it.isReadable()
+            } ?: throw DumperException("Address ${start.toHex()} is not mapped (or not readable) in the target process!")
+
+        outputHandler.appendInfo("Custom range ${start.toHex()}-${end.toHex()} (${(end - start).Bytes_to_MB}MB)")
+        return MapLineParser(start, end, containing.getPath())
     }
 
     /**
@@ -241,4 +386,3 @@ class Dumper(private val context: Context, private val config: DumperConfig, pri
         }
     }
 }
-

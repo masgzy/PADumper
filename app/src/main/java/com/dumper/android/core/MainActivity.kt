@@ -130,19 +130,28 @@ class MainActivity : AppCompatActivity() {
         process: String,
         dumpFile: String,
         isDumpGlobalMetadata: Boolean,
-        autoFix: Boolean
+        autoFix: Boolean,
+        dumpAllMemory: Boolean = false
     ) {
         if (process.isBlank()) {
             Toast.makeText(this, R.string.process_name_empty, Toast.LENGTH_SHORT).show()
             return
         }
 
-        if (dumpFile.isBlank()) {
+        // The lib name is only needed for single-region dumps - "dump all
+        // memory" ignores it entirely.
+        if (!dumpAllMemory && dumpFile.isBlank()) {
             Toast.makeText(this, R.string.lib_name_empty, Toast.LENGTH_SHORT).show()
             return
         }
 
-        val config = DumperConfig(process, dumpFile, autoFix, isDumpGlobalMetadata)
+        val config = DumperConfig(
+            process,
+            dumpFile,
+            autoFix,
+            isDumpGlobalMetadata,
+            dumpAllMemory = dumpAllMemory
+        )
 
         if (dumperConnection != null) {
             dumperConnection?.dump(config)

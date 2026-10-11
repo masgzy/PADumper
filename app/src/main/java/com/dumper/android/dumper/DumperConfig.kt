@@ -10,5 +10,6 @@ data class DumperConfig(
     var file: String,
     var autoFix: Boolean,
     val isDumpMetadata: Boolean,
+    val dumpAllMemory: Boolean = false,
     val limitMaxDumpSize: Long = 1000.MB_to_Bytes
 ): Parcelable

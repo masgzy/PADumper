@@ -13,6 +13,8 @@ Android process memory dumper, especially for the il2cpp game at runtime.
 - [x] Support detects ELF arch
 - [x] Support root or non-root with virtual space
 - [x] In-app language switching (English / 简体中文)
+- [x] Custom address range dumping (including anonymous memory regions)
+- [x] One-click dump of every readable memory region of the process
 
 ## How To Use
 
@@ -20,8 +22,10 @@ Android process memory dumper, especially for the il2cpp game at runtime.
 - Open [PADumper](https://github.com/masgzy/PADumper/releases)
 - Put the process name manually or you can click `Select Apps` to select running apps
 - Put the ELF Name or you can leave it with the default name `libil2cpp.so`
+  - **Custom address range**: type a hex range `startAddress-endAddress` (e.g. `7f2b1c001000-7f2b1c0b7000`) to dump any region, including anonymous ones; the start address must fall inside a readable mapping of the target process
 - [**Optional**] Check `Fix ELF` if you want to fix the ELF
 - [**Optional**] Check `global-metadata.dat` if you want to dump unity metadata from memory
+- [**Optional**] Check `Dump all memory` to dump every readable region (unreadable regions are skipped automatically, adjacent mappings of the same allocation are merged; regions over the size limit or failing to dump are logged and skipped without affecting the rest)
 - Dump and wait until the dumping finish
 - Output:
   - Root Method: `/sdcard/PADumper/[Process]/[startAddress-endAddress-file]`

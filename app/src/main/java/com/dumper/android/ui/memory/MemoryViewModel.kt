@@ -15,6 +15,7 @@ class MemoryViewModel : ViewModel() {
     val libName = MutableStateFlow("libil2cpp.so")
     val isFixELF = MutableStateFlow(false)
     val isDumpMetadata = MutableStateFlow(false)
+    val isDumpAllMemory = MutableStateFlow(false)
     val isDialogProcessList = MutableStateFlow(false)
     val processList = MutableLiveData<Array<ProcessData>>()
 
@@ -33,7 +34,8 @@ class MemoryViewModel : ViewModel() {
             process = packageName.value,
             dumpFile = libName.value,
             isDumpGlobalMetadata = isDumpMetadata.value,
-            autoFix = isFixELF.value
+            autoFix = isFixELF.value,
+            dumpAllMemory = isDumpAllMemory.value
         )
     }
 
@@ -59,5 +61,9 @@ class MemoryViewModel : ViewModel() {
 
     fun changeDumpMetadata(isDumpMetadata: Boolean) {
         this.isDumpMetadata.value = isDumpMetadata
+    }
+
+    fun changeDumpAllMemory(isDumpAll: Boolean) {
+        isDumpAllMemory.value = isDumpAll
     }
 }

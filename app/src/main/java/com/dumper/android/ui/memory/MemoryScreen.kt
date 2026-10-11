@@ -92,6 +92,7 @@ fun MemoryScreen(navController: NavController, viewModel: MemoryViewModel) {
         val libName by viewModel.libName.collectAsState()
         val autoFix by viewModel.isFixELF.collectAsState()
         val metadata by viewModel.isDumpMetadata.collectAsState()
+        val dumpAllMemory by viewModel.isDumpAllMemory.collectAsState()
 
         // The bundled SoFixer binaries only exist for arm32/arm64; on
         // x86/x86_64-only devices the fix step would silently do nothing.
@@ -113,12 +114,15 @@ fun MemoryScreen(navController: NavController, viewModel: MemoryViewModel) {
             Text(stringResource(R.string.select_process))
         }
 
-        OutlinedTextField(
-            value = libName,
-            onValueChange = { viewModel.changeLibName(it) },
-            label = { Text(stringResource(R.string.elf_name)) },
-            modifier = Modifier.fillMaxWidth()
-        )
+        if (!dumpAllMemory) {
+            OutlinedTextField(
+                value = libName,
+                onValueChange = { viewModel.changeLibName(it) },
+                label = { Text(stringResource(R.string.elf_name)) },
+                supportingText = { Text(stringResource(R.string.elf_name_hint)) },
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
 
         LabelledCheckBox(
             modifier = Modifier.fillMaxWidth(),
@@ -139,6 +143,20 @@ fun MemoryScreen(navController: NavController, viewModel: MemoryViewModel) {
             checked = metadata,
             onCheckedChange = { viewModel.changeDumpMetadata(it) },
             label =stringResource(R.string.dump_global_metadata_dat))
+
+        LabelledCheckBox(
+            checked = dumpAllMemory,
+            onCheckedChange = { viewModel.changeDumpAllMemory(it) },
+            label = stringResource(R.string.dump_all_memory))
+
+        if (dumpAllMemory) {
+            Text(
+                text = stringResource(R.string.dump_all_memory_warning),
+                color = MaterialTheme.colorScheme.tertiary,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(start = 32.dp)
+            )
+        }
 
 
         Button(

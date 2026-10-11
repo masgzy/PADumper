@@ -3,9 +3,12 @@
     <string name="process_name">Process Name</string>
     <string name="select_process">Select Apps</string>
     <string name="elf_name">ELF Name</string>
+    <string name="elf_name_hint">Library name or hex range, e.g. libil2cpp.so or 7f2b1c001000-7f2b1c0b7000</string>
     <string name="dump_global_metadata_dat">Dump global-metadata.dat</string>
     <string name="fix_elf_result">Fix ELF</string>
     <string name="fix_elf_no_arm_abi">This device has no ARM ABI - the ELF fixer only supports arm32/arm64 and would be skipped.</string>
+    <string name="dump_all_memory">Dump all memory</string>
+    <string name="dump_all_memory_warning">Dumps every readable memory region of the target process. This can take a long time and may use several GB of storage.</string>
     <string name="dump">Dump</string>
     <string name="github_repository">Github</string>
     <string name="home">Home</string>

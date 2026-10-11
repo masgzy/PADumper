@@ -3,9 +3,12 @@
     <string name="process_name">进程名称</string>
     <string name="select_process">选择应用</string>
     <string name="elf_name">ELF 文件名</string>
+    <string name="elf_name_hint">库名或十六进制地址范围，如 libil2cpp.so 或 7f2b1c001000-7f2b1c0b7000</string>
     <string name="dump_global_metadata_dat">转储 global-metadata.dat</string>
     <string name="fix_elf_result">修复 ELF</string>
     <string name="fix_elf_no_arm_abi">此设备不含 ARM ABI，ELF 修复仅支持 arm32/arm64，将被跳过。</string>
+    <string name="dump_all_memory">转储全部内存</string>
+    <string name="dump_all_memory_warning">将转储目标进程全部可读内存区域，耗时可能较长，且可能占用数 GB 存储空间。</string>
     <string name="dump">开始转储</string>
     <string name="github_repository">GitHub</string>
     <string name="home">首页</string>
