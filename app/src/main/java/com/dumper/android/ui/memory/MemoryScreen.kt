@@ -1,5 +1,6 @@
 package com.dumper.android.ui.memory
 
+import android.os.Build
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -14,6 +15,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -91,6 +93,12 @@ fun MemoryScreen(navController: NavController, viewModel: MemoryViewModel) {
         val autoFix by viewModel.isFixELF.collectAsState()
         val metadata by viewModel.isDumpMetadata.collectAsState()
 
+        // The bundled SoFixer binaries only exist for arm32/arm64; on
+        // x86/x86_64-only devices the fix step would silently do nothing.
+        val hasArmAbi = remember {
+            Build.SUPPORTED_ABIS.any { it.startsWith("armeabi") || it.startsWith("arm64") }
+        }
+
         OutlinedTextField(
             value = processText,
             onValueChange = { viewModel.changePackageName(it) },
@@ -117,6 +125,15 @@ fun MemoryScreen(navController: NavController, viewModel: MemoryViewModel) {
             checked = autoFix,
             onCheckedChange = { viewModel.changeFixELF(it) },
             label = stringResource(R.string.fix_elf_result))
+
+        if (autoFix && !hasArmAbi) {
+            Text(
+                text = stringResource(R.string.fix_elf_no_arm_abi),
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(start = 32.dp)
+            )
+        }
 
         LabelledCheckBox(
             checked = metadata,

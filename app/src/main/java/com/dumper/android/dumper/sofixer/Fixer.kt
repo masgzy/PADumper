@@ -29,8 +29,12 @@ class Fixer(private val fixerPath: String) {
         outputFile: File,
         outLog: OutputHandler
     ) {
-        if (archELF == Arch.UNKNOWN)
+        if (archELF == Arch.UNKNOWN) {
+            // The bundled fixer binaries only exist for arm32/arm64 - without
+            // this log the fix step silently did nothing on other ABIs.
+            outLog.appendWarning("ELF architecture not supported by the fixer (arm32/arm64 only), skipping...")
             return
+        }
 
         outLog.appendInfo("Fixing...")
         outLog.appendInfo("Fixer output :")
